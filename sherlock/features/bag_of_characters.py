@@ -3,7 +3,7 @@ from sherlock.features.stats_helper import compute_stats
 from collections import OrderedDict
 from sherlock.features.helpers import CHARACTERS_TO_CHECK
 from sherlock.global_state import is_first
-
+from datetime import datetime
 
 # Input: a single column in the form of Python list
 # Output: ordered dictionary holding bag of character features
@@ -11,6 +11,9 @@ def extract_bag_of_characters_features(col_values: list, features: OrderedDict):
     # Create a set of unique chars from the string vectors to quickly test whether to perform expensive
     # processing for any given char
     char_set = set(''.join(col_values))
+    
+    start_time = datetime.now()
+    print('Bag of characters started:',start_time)
 
     for c in CHARACTERS_TO_CHECK:
         value_feature_name = f'n_[{c}]'
@@ -61,3 +64,7 @@ def extract_bag_of_characters_features(col_values: list, features: OrderedDict):
             else:
                 # assign pre-rendered defaults
                 features[value_feature_name + '-pre-rendered'] = '0,0,0,0,0,0,0,0,-3,0'
+
+    end_time = datetime.now()
+    print('Bag of characters completed:', end_time)
+    print('Total time taken for bag of characters:',end_time-start_time)

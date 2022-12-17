@@ -14,22 +14,24 @@ from tqdm import tqdm
 from sherlock.features.bag_of_characters import extract_bag_of_characters_features
 from sherlock.features.bag_of_words import extract_bag_of_words_features
 from sherlock.features.word_embeddings import extract_word_embeddings_features
+from sherlock.features.custom_features import extract_addl_feats
 from sherlock.features.paragraph_vectors import infer_paragraph_embeddings_features
 from sherlock.global_state import set_first, reset_first
 from sherlock.features.helpers import literal_eval_as_str, keys_to_csv
-
+from datetime import datetime
+ignoreList = ['#na','#n/a','na','n/a','none','nan','blank','blanks']
 
 def prepare_feature_extraction():
     """Download embedding files from Google Drive if they do not exist yet."""
-    word_embedding_file = "../sherlock/features/glove.6B.50d.txt"
+    word_embedding_file = "sherlock/features/glove.6B.50d.txt"
     first_paragraph_vector_file = (
-        "../sherlock/features/par_vec_trained_400.pkl.docvecs.vectors_docs.npy"
+        "sherlock/features/par_vec_trained_400.pkl.docvecs.vectors_docs.npy"
     )
     second_paragraph_vector_file = (
-        "../sherlock/features/par_vec_trained_400.pkl.trainables.syn1neg.npy"
+        "sherlock/features/par_vec_trained_400.pkl.trainables.syn1neg.npy"
     )
     third_paragraph_vector_file = (
-        "../sherlock/features/par_vec_trained_400.pkl.wv.vectors.npy"
+        "sherlock/features/par_vec_trained_400.pkl.wv.vectors.npy"
     )
 
     print(
@@ -79,6 +81,18 @@ def prepare_feature_extraction():
 
     print("All files for extracting word and paragraph embeddings are present.")
 
+#### Remove ASCII Characters from the data
+def removeASCII(strs):
+    return ''.join([char for word in str(strs) for char in word if ord(char)<128])
+
+def additional_processing(col_values: list):
+    print('Custom Preprocessing started:',datetime.now())
+    value = ['' if val is None or pd.isnull(val) else val for val in col_values]
+    value = ['' if str(val).lower() in ignoreList else val for val in value]
+    value = [str(val).replace('\xa0',' ').strip() for val in value]
+    value = [removeASCII(val) for val in value] ### Remove Ascii Characters
+    print('Custom preprocessing completed:',datetime.now())
+    return value
 
 def convert_string_lists_to_lists(
     data: Union[pd.DataFrame, pd.Series],
@@ -138,8 +152,8 @@ def convert_string_lists_to_lists(
 def load_parquet_values(path):
     pf = ParquetFile(source=path)
     row_df = pf.read_row_group(0)
-
-    return row_df["values"]
+    parq_df = pd.read_parquet(path)
+    return parq_df, row_df["values"]
 
 
 def extract_features(output_filename, data: Union[pd.DataFrame, pd.Series]):
@@ -159,27 +173,41 @@ def extract_features(output_filename, data: Union[pd.DataFrame, pd.Series]):
     first_keys = None
 
     reset_first()
-
+    
     with open(output_filename, "w") as outfile:
-        for raw_sample in tqdm(data, desc="Extracting Features"):
-            n_samples = 1000
+        for index,row in tqdm(data.iterrows(), desc="Extracting Features"):
+            
+            raw_sample = row['values']
+            table_name = row['table_name']
+            column_name = row['column_name']
+            n_samples = 1000000
             n_values = len(raw_sample)
 
-            if n_samples > n_values:
-                n_samples = n_values
-
-            random.seed(13)
-            raw_sample = random.sample(raw_sample, k=n_samples)
+            if n_samples < n_values:
+                random.seed(13)
+                raw_sample = random.sample(raw_sample, k=n_samples)
+            else:
+                n_samples = n_values      
 
             features = OrderedDict()
+	
+            cleaned_sample_nan = additional_processing(raw_sample)
+            cleaned_sample_wo_nan = [val for val in cleaned_sample_nan if len(val)>0]
+            cleaned_sample_wo_nan_uncased = [val.lower() for val in cleaned_sample_wo_nan]
+            uniq_cleaned_sample = list(set(cleaned_sample_wo_nan))
 
-            extract_bag_of_characters_features(raw_sample, features)
-            extract_word_embeddings_features(raw_sample, features)
-            extract_bag_of_words_features(raw_sample, features, n_samples)
-
+            extract_bag_of_characters_features(cleaned_sample_wo_nan, features)
+            extract_word_embeddings_features(cleaned_sample_wo_nan, features,prefix = 'values')
+            extract_word_embeddings_features([column_name], features ,prefix = 'columns')
+            extract_word_embeddings_features([table_name], features,prefix = 'tables')
+            extract_bag_of_words_features(cleaned_sample_nan,cleaned_sample_wo_nan_uncased, features, n_samples)
+            extract_addl_feats(cleaned_sample_nan, features, n_samples)
+            features['table_population'] = n_values
+            features['table_sample'] = n_samples
+            
             # TODO use data_no_null version?
             infer_paragraph_embeddings_features(
-                raw_sample, features, vec_dim, reuse_model
+                uniq_cleaned_sample, features, vec_dim, reuse_model
             )
 
             if first_keys is None:
@@ -190,7 +218,7 @@ def extract_features(output_filename, data: Union[pd.DataFrame, pd.Series]):
 
                 outfile.write(first_keys_str + "\n")
 
-                set_first()
+                #set_first()
             elif verify_keys:
                 keys = ",".join(features.keys())
                 if first_keys_str != keys:

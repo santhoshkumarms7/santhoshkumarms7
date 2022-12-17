@@ -5,13 +5,12 @@ from collections import OrderedDict
 import pandas as pd
 import nltk
 from nltk.corpus import stopwords
-
+import pickle
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from datetime import datetime
 from sherlock.global_state import is_first
 
 assert gensim.models.doc2vec.FAST_VERSION > -1, "This will be painfully slow otherwise"
-
 
 def tokenise(values):
     joined = " ".join(s for s in values if len(s) >= 2)
@@ -67,7 +66,7 @@ def train_paragraph_embeddings_features(columns, dim):
     )
 
     # Save trained model
-    model_file = f"../sherlock/features/par_vec_trained_{dim}.pkl"
+    model_file = f"dbfs/par_vec_trained_model_{dim}.pkl"
 
     train_model.save(model_file)
     train_model.delete_temporary_training_data(
@@ -79,15 +78,15 @@ DIM = 400
 model: Doc2Vec
 
 
-def initialise_pretrained_model(dim):
+def initialise_pretrained_model(path,dim):
     start = datetime.now()
     global model
 
-    filename = f"../sherlock/features/par_vec_trained_{dim}.pkl"
-
+    filename = f"{path}/par_vec_trained_model_{dim}.pkl"        
     assert dim == DIM
 
     model = Doc2Vec.load(filename)
+    
     model.delete_temporary_training_data(keep_doctags_vectors=True, keep_inference=True)
     print(
         f"Initialise Doc2Vec Model, {dim} dim, process took {datetime.now() - start} seconds. (filename = {filename})"
@@ -119,6 +118,9 @@ def infer_paragraph_embeddings_features(
         # Load pretrained paragraph vector model
         initialise_pretrained_model(dim)
 
+    start_time = datetime.now()
+    print('paragraph embeddings feature started:', start_time)
+
     # Resetting the random seed before inference keeps the inference vectors deterministic. Gensim uses random values
     # in the inference process, so setting the seed just beforehand makes the inference repeatable.
     # https://github.com/RaRe-Technologies/gensim/issues/447
@@ -129,7 +131,7 @@ def infer_paragraph_embeddings_features(
     model.random.seed(13)
 
     tokens = tokenise(col_values)
-
+    
     # Infer paragraph vector for data sample.
     inferred = model.infer_vector(tokens, steps=20, alpha=0.025)
 
@@ -141,3 +143,7 @@ def infer_paragraph_embeddings_features(
         # subsequent lines only care about values, so we can pre-render a block of CSV. This
         # cuts overhead of storing granular values in the features dictionary
         features["par_vec-pre-rendered"] = ",".join(map(lambda x: "%g" % x, inferred))
+
+    end_time = datetime.now()
+    print('paragraph embeddings feature completed:', end_time)
+    print('Total time taken for paragraph embeddings features:',end_time-start_time)

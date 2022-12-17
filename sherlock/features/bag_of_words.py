@@ -8,7 +8,7 @@ import string
 import re
 import statistics as statistics
 from sherlock.global_state import is_first
-
+from datetime import datetime
 
 def count_pattern_in_cells(values: list, pat):
     return [len(re.findall(pat, s)) for s in values]
@@ -36,19 +36,32 @@ SPECIAL_CHARACTERS_PATTERN = re.compile(r'[!@#$%^&*(),.?":{}|<>]')
 
 # Input: a single column in the form of a Python list
 # Output: ordered dictionary holding bag of words features
-def extract_bag_of_words_features(col_values: list, features: OrderedDict, n_val):
-    if not n_val:
-        return
+def extract_bag_of_words_features(col_values: list, col_values_wo_nan_uncased: list, features: OrderedDict):
+    
+    start_time = datetime.now()
+    n_val = len(col_values)
+
+    print('Bag of words started:', start_time)
+    print('Bag of words col entropy started:', datetime.now())
 
     # Entropy of column
-    freq_dist = nltk.FreqDist(col_values)
+    freq_dist = nltk.FreqDist(col_values_wo_nan_uncased)
     probs = [freq_dist.freq(l) for l in freq_dist]
     features["col_entropy"] = -sum(p * math.log(p, 2) for p in probs)
 
-    # Fraction of cells with unique content
-    num_unique = len(set(col_values))
-    features["frac_unique"] = num_unique / n_val
+    print('Bag of words frac unique started:', datetime.now())
 
+    # Fraction of cells with unique content
+    num_unique = len(set(col_values_wo_nan_uncased))
+
+    if len(col_values_wo_nan_uncased)==0:
+      features["frac_unique_sample"] = 0
+      features['uniq_values_sample'] = 0
+    
+    else:
+      features["frac_unique_sample"] = num_unique / len(col_values_wo_nan_uncased)
+      features['uniq_values_sample'] = len(set(col_values_wo_nan_uncased))
+    
     # Fraction of cells with numeric content -> frac text cells doesn't add information
     numeric_cell_nz_count, numeric_char_counts = count_pattern_in_cells_with_non_zero_count(
         col_values, NUMBER_PATTERN
@@ -56,36 +69,50 @@ def extract_bag_of_words_features(col_values: list, features: OrderedDict, n_val
     text_cell_nz_count, text_char_counts = count_pattern_in_cells_with_non_zero_count(
         col_values, TEXT_PATTERN
     )
+    
+    alphanum_cell_counts = [len(col_values[idx]) if (numeric_char_counts[idx]>0 and text_char_counts[idx]>0) else 0 for idx in range(len(col_values))]
+    alphanum_cell_nz_count, alphanum_char_counts = sum(1 for c in alphanum_cell_counts if c > 0), alphanum_cell_counts
 
-    features["frac_numcells"] = numeric_cell_nz_count / n_val
-    features["frac_textcells"] = text_cell_nz_count / n_val
+    features["numeric_cell_nz_count"] = numeric_cell_nz_count
+    features["text_cell_nz_count"] = text_cell_nz_count
+    features["alphanum_cell_nz_count"] = alphanum_cell_nz_count
+    
+    features["frac_numcells"] = numeric_cell_nz_count / n_val if n_val > 0 else 0
+    features["frac_textcells"] = text_cell_nz_count / n_val if n_val > 0 else 0
+    features["frac_alphanumcells"] = alphanum_cell_nz_count / n_val if n_val > 0 else 0
+
+    print('Bag of words avg,std features started:', datetime.now())
 
     # Average + std number of numeric tokens in cells
-    features["avg_num_cells"] = np.mean(numeric_char_counts)
-    features["std_num_cells"] = np.std(numeric_char_counts)
+    features["avg_num_cells"] = np.mean(numeric_char_counts) if n_val > 0 else 0
+    features["std_num_cells"] = np.std(numeric_char_counts) if n_val > 0 else 0
 
     # Average + std number of textual tokens in cells
-    features["avg_text_cells"] = np.mean(text_char_counts)
-    features["std_text_cells"] = np.std(text_char_counts)
+    features["avg_text_cells"] = np.mean(text_char_counts) if n_val > 0 else 0
+    features["std_text_cells"] = np.std(text_char_counts) if n_val > 0 else 0
+
+    # Average + std number of alphanum tokens in cells
+    features["avg_alphanum_cells"] = np.mean(alphanum_char_counts) if n_val > 0 else 0
+    features["std_alphanum_cells"] = np.std(alphanum_char_counts) if n_val > 0 else 0
 
     # Average + std number of special characters in each cell
     spec_char_counts = count_pattern_in_cells(col_values, SPECIAL_CHARACTERS_PATTERN)
 
-    features["avg_spec_cells"] = np.mean(spec_char_counts)
-    features["std_spec_cells"] = np.std(spec_char_counts)
+    features["avg_spec_cells"] = np.mean(spec_char_counts) if n_val > 0 else 0
+    features["std_spec_cells"] = np.std(spec_char_counts) if n_val > 0 else 0
 
     # Average number of words in each cell
     word_counts = count_pattern_in_cells(col_values, WORD_PATTERN)
 
-    features["avg_word_cells"] = np.mean(word_counts)
-    features["std_word_cells"] = np.std(word_counts)
-
-    features["n_values"] = n_val
+    features["avg_word_cells"] = np.mean(word_counts) if n_val > 0 else 0
+    features["std_word_cells"] = np.std(word_counts) if n_val > 0 else 0
 
     lengths = [len(s) for s in col_values]
     n_none = sum(1 for _l in lengths if _l == 0)
 
     has_any = any(lengths)
+
+    print('Bag of words statistical features started:', datetime.now())
 
     if has_any:
         _any = 1
@@ -127,7 +154,13 @@ def extract_bag_of_words_features(col_values: list, features: OrderedDict, n_val
             # assign pre-rendered defaults
             features["length-pre-rendered"] = "0,0,0,0,0,0,0,0,-3,0"
 
-    features["none-agg-has"] = 1 if n_none > 0 else 0
-    features["none-agg-percent"] = n_none / n_val
-    features["none-agg-num"] = n_none
-    features["none-agg-all"] = 1 if n_none == n_val else 0
+    print('Bag of words none features started:', datetime.now())
+    
+    features["none-agg-has_sample"] = 1 if n_none > 0 else 0
+    features["none-agg-percent_sample"] = n_none / n_val if n_val > 0 else 0
+    features["none-agg-num_sample"] = n_none
+    features["none-agg-all_sample"] = 1 if n_none == n_val else 0
+
+    end_time = datetime.now()
+    print('Bag of words completed:', end_time)
+    print('Total time taken for bag of words:',end_time-start_time)

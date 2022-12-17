@@ -17,7 +17,7 @@ def initialise_word_embeddings():
     global word_to_embedding
 
     print("Initialising word embeddings")
-    word_vectors_f = open('../sherlock/features/glove.6B.50d.txt', encoding='utf-8')
+    word_vectors_f = open('sherlock/features/glove.6B.50d.txt', encoding='utf-8')
 
     for w in word_vectors_f:
         term, vector = w.strip().split(' ', 1)
@@ -34,9 +34,9 @@ def initialise_word_embeddings():
 
 
 ZEROS = [0] * 50
-
+REPL_STR = 0
 # nans for mean, median, stdev and mode for each embedding
-NANS = ','.join(map(str, [np.nan] * 50 * 4))
+NANS = ','.join(map(str, [REPL_STR] * 50 * 4))
 
 
 def transpose(a):
@@ -51,7 +51,11 @@ def transpose(a):
 
 # Input: a single column in the form of a Python list
 # Output: ordered dictionary holding word embedding features
-def extract_word_embeddings_features(col_values: list, features: OrderedDict):
+def extract_word_embeddings_features(col_values: list, features: OrderedDict, prefix: str):
+
+    start_time = datetime.now()
+    print('word embeddings feature started:', start_time)
+
     num_embeddings = 50
 
     embeddings = []
@@ -76,25 +80,26 @@ def extract_word_embeddings_features(col_values: list, features: OrderedDict):
                 embeddings.append(mean_of_word_embeddings)
 
     n_rows = len(embeddings)
+    print('word embeddings statistical aggregation started:', datetime.now())
 
     if n_rows == 0:
         if is_first():
             # the first output needs fully expanded keys (to drive CSV header)
             # need to maintain same insertion order as the other case, hence running for loop per feature
             for i in range(num_embeddings):
-                features['word_embedding_avg_' + str(i)] = np.nan
+                features[prefix + '_word_embedding_avg_' + str(i)] = REPL_STR
             for i in range(num_embeddings):
-                features['word_embedding_std_' + str(i)] = np.nan
+                features[prefix + '_word_embedding_std_' + str(i)] = REPL_STR
             for i in range(num_embeddings):
-                features['word_embedding_med_' + str(i)] = np.nan
+                features[prefix + '_word_embedding_med_' + str(i)] = REPL_STR
             for i in range(num_embeddings):
-                features['word_embedding_mode_' + str(i)] = np.nan
+                features[prefix + '_word_embedding_mode_' + str(i)] = REPL_STR
         else:
             # subsequent lines only care about values, so we can pre-render a block of CSV. This
             # cuts overhead of storing granular values in the features dictionary
-            features['word_embedding-pre-rendered'] = NANS
+            features[prefix + '_word_embedding-pre-rendered'] = NANS
 
-        features['word_embedding_feature'] = 0
+        features[prefix + '_word_embedding_feature'] = 0
 
     else:
         if n_rows > 1:
@@ -131,13 +136,13 @@ def extract_word_embeddings_features(col_values: list, features: OrderedDict):
         if is_first():
             # the first output needs fully expanded keys (to drive CSV header)
             for i, e in enumerate(mean_embeddings):
-                features['word_embedding_avg_' + str(i)] = e
+                features[prefix + '_word_embedding_avg_' + str(i)] = e
             for i, e in enumerate(std_embeddings):
-                features['word_embedding_std_' + str(i)] = e
+                features[prefix + '_word_embedding_std_' + str(i)] = e
             for i, e in enumerate(med_embeddings):
-                features['word_embedding_med_' + str(i)] = e
+                features[prefix + '_word_embedding_med_' + str(i)] = e
             for i, e in enumerate(mode_embeddings):
-                features['word_embedding_mode_' + str(i)] = e
+                features[prefix + '_word_embedding_mode_' + str(i)] = e
         else:
             # subsequent lines only care about values, so we can pre-render a block of CSV. This
             # cuts overhead of storing granular values in the features dictionary
@@ -145,4 +150,10 @@ def extract_word_embeddings_features(col_values: list, features: OrderedDict):
                 ','.join(map(lambda x: '%g' % x,
                              itertools.chain(mean_embeddings, std_embeddings, med_embeddings, mode_embeddings)))
 
-        features['word_embedding_feature'] = 1
+        features[prefix + '_word_embedding_feature'] = 1
+
+    print('word embeddings statistical aggregation completed:', datetime.now())
+	
+    end_time = datetime.now()
+    print('word embeddings feature completed:', end_time)
+    print('Total time taken for word embeddings features:',end_time-start_time)
