@@ -54,8 +54,9 @@ def alphaAndNumericMatch(value):
     value = str(value)
     charCount = len(re.findall(string = value,pattern='[a-zA-Z]'))
     numCount = len(re.findall(string = value,pattern='\d'))
+    specialCharCount = len(re.findall(string=value,pattern='[!#&\'()*+\-/:;<=>?@[\\]^_`{|}~]'))
     
-    if charCount >0 and numCount>0:
+    if (charCount >0 or specialCharCount) and numCount>0:
         return 'alphanumeric'
     elif numCount > 0:
         return 'numeric'
@@ -249,7 +250,7 @@ def additional_features(col_values: list, date_samples=1000):
     print(e)
 
   mean_before_int = mean_before_int if pd.notnull(mean_before_int) else 0
-
+  
   if len(int_type)>0:
     int_mean, int_variance, int_skew, int_kurtosis, int_min, int_max, int_sum = compute_stats(int_type)
 

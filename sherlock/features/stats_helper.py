@@ -7,6 +7,7 @@ import numpy as np
 # based on code found here:
 # https://stackoverflow.com/questions/61521371/calculate-weighted-statistical-moments-in-python
 def compute_stats(values):
+    values = np.array(values)
     _min = min(values)
     _max = max(values)
     _sum = sum(values)

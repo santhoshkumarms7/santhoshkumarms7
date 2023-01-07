@@ -16,7 +16,7 @@ def categorize_features() -> dict:
     feature_cols_dict = {}
     for feature_set in ["char", "word", "par", "rest"]:
         feature_cols_dict[feature_set] = pd.read_csv(
-            f"../sherlock/features/feature_column_identifiers/{feature_set}_col.tsv",
+            f"sherlock/features/feature_column_identifiers/{feature_set}_col.tsv",
             sep="\t",
             index_col=0,
             header=None,
@@ -52,7 +52,7 @@ def _get_categorical_label_encodings(y_train, y_val, model_id: str) -> (list, li
     encoder = LabelEncoder()
     encoder.fit(y_train)
 
-    np.save(f"../model_files/classes_{model_id}.npy", encoder.classes_)
+    np.save(f"model_files/classes_{model_id}.npy", encoder.classes_)
 
     # Convert train labels
     y_train_int = encoder.transform(y_train)
@@ -83,7 +83,7 @@ def _proba_to_classes(y_pred, model_id: str = "sherlock") -> np.array:
     y_pred_int = np.argmax(y_pred, axis=1)
     encoder = LabelEncoder()
     encoder.classes_ = np.load(
-        f"../model_files/classes_{model_id}.npy", allow_pickle=True
+        f"model_files/classes_{model_id}.npy", allow_pickle=True
     )
 
     y_pred = encoder.inverse_transform(y_pred_int)

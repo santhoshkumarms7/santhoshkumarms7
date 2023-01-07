@@ -28,7 +28,7 @@ from sherlock.features.custom_features import extract_addl_feats
 from sherlock.features.paragraph_vectors import infer_paragraph_embeddings_features
 from sherlock.features.helpers import literal_eval_as_str, keys_to_csv
 from sherlock.global_state import is_first, set_first, reset_first
-ignoreList = ['#na','#n/a','na','n/a','none','nan','blank','blanks']
+ignoreList = ['#na','#n/a','na','n/a','none','nan','blank','blanks','nil','n.a.','n.a']
 
 def as_py_str(x):
     return x.as_py() if isinstance(x, pyarrow.lib.StringScalar) else x
@@ -40,9 +40,13 @@ def random_sample(values: list):
     random.seed(13)
     return random.sample(values, k=min(1000000, len(values)))
 
-def special_token_repl(text: str):
+def special_token_repl(text: str, suffix: str):
     replaced_text = text.translate(str.maketrans(string.punctuation, ' ' * len(string.punctuation)))
     replaced_text = re.sub(string=replaced_text,pattern=' +',repl=' ')
+    
+    if replaced_text == '':
+        replaced_text = 'unknown' + suffix
+    
     return replaced_text
 
 # Clean whitespace from strings by:
@@ -69,16 +73,18 @@ def additional_processing(value):
 
 def normalise_string_whitespace(col_values):
 
-    id = col_values[0]
-    table_name = col_values[1]
-    column_name = col_values[2]
-
-    normalized_values = list(map(normalise_whitespace, col_values[3:]))
+    master_id = col_values[0]
+    id = col_values[1]
+    dataset_name = col_values[2]
+    table_name = col_values[3]
+    column_name = col_values[4]
+    
+    normalized_values = list(map(normalise_whitespace, col_values[5:]))
     
     ### Removing the table and column name from values ## Added to remove features list
-    normalized_values = [val for val in normalized_values if str(val).lower() not in [table_name.lower(),column_name.lower()]]
+    normalized_values = [val for val in normalized_values if str(val).lower() not in [dataset_name.lower() ,table_name.lower(),column_name.lower()]]
     
-    normalized_values_upd = [id] + [table_name] + [column_name] + normalized_values
+    normalized_values_upd = [master_id] + [id] + [dataset_name] + [table_name] + [column_name] + normalized_values
     return normalized_values_upd
 
 #### Remove ASCII Characters from the data
@@ -92,11 +98,16 @@ def extract_features(col_values: list):
     vec_dim = 400
     reuse_model=True
 
-    id = col_values[0]
-    table_name = col_values[1]
-    column_name = col_values[2]
-    col_values = col_values[3:]
-
+    master_id = col_values[0]
+    id = col_values[1]
+    dataset_name = col_values[2]
+    table_name = col_values[3]
+    column_name = col_values[4]
+    col_values = col_values[5:]
+    
+    table_name_clean = special_token_repl(table_name,suffix='_table_name')
+    column_name_clean = special_token_repl(column_name,suffix='_column_name')
+    
     n_samples = 1000000
     n_values = len(col_values)
     features = OrderedDict()
@@ -123,9 +134,9 @@ def extract_features(col_values: list):
     print('='*100)
     extract_word_embeddings_features(cleaned_sample_wo_nan,features,prefix = 'values')
     print('='*100)
-    extract_word_embeddings_features([table_name],features,prefix = 'table')
+    extract_word_embeddings_features([table_name_clean],features,prefix = 'table_name')
     print('='*100)
-    extract_word_embeddings_features([column_name],features,prefix = 'column')
+    extract_word_embeddings_features([column_name_clean],features,prefix = 'column_name')
     print('='*100)
     extract_bag_of_words_features(cleaned_sample_nan,cleaned_sample_wo_nan_uncased, features)
     print('='*100)
@@ -150,9 +161,11 @@ def extract_features(col_values: list):
     features["none-agg-num_population"] = n_none
     features["none-agg-all_population"] = 1 if n_none == n_values else 0
 
+    features['master_id'] = master_id
     features['id'] = id
+    features['dataset_name'] = dataset_name    
     features['table_name'] = table_name
-    features['column_name'] = column_name
+    features['column_name'] = column_name    
 
     print('Completed...')
     print('#'*100)
@@ -210,8 +223,8 @@ def parallelize_dataframe(df, func):
     pool.join()
     return df
 
-def remove_table_column_name(values,table_name,column_name):
-    return [val for val in values if str(val).lower() not in [table_name.lower(), column_name.lower()]]    
+def remove_table_column_name(values,dataset_name,table_name,column_name):
+    return [val for val in values if str(val).lower() not in [dataset_name.lower(), table_name.lower(), column_name.lower()]]    
 
 def extract_features_to_csv(parquet_df):
 
@@ -219,18 +232,22 @@ def extract_features_to_csv(parquet_df):
     
     features_df = pd.DataFrame()
 
-    parquet_df['clean_values'] = parquet_df.apply(lambda x: remove_table_column_name(x['values'],x['table_name'],x['column_name']),axis=1)   
+    parquet_df['clean_values'] = parquet_df.apply(lambda x: remove_table_column_name(x['values'],x['dataset_name'],x['table_name'],x['column_name']),axis=1)
+    
+    parquet_df['master_id'] = parquet_df['master_id'].astype(str)
+    parquet_df['id'] = parquet_df['id'].astype(str)
+    parquet_df['dataset_name'] = parquet_df['dataset_name'].astype(str)
+    parquet_df['table_name'] = parquet_df['table_name'].astype(str)
+    parquet_df['column_name'] = parquet_df['column_name'].astype(str)
+    
+    master_id = parquet_df['master_id'].values.tolist()
+    id = parquet_df['id'].values.tolist()
+    dataset_name = parquet_df['dataset_name'].values.tolist()    
+    table_name = parquet_df['table_name'].values.tolist()
+    column_name = parquet_df['column_name'].values.tolist()  
     data_values = parquet_df['clean_values'].values.tolist()
     
-    id = parquet_df['id'].values.tolist()
-
-    parquet_df['column_name'] = parquet_df['column_name'].apply(special_token_repl)
-    column_name = parquet_df['column_name'].values.tolist()
-
-    parquet_df['table_name'] = parquet_df['table_name'].apply(special_token_repl)
-    table_name = parquet_df['table_name'].values.tolist()
-
-    parquet_values = [ [id[val]] + [table_name[val]] + [column_name[val]] + list(data_values[val]) for val in range(len(parquet_df)) ]     
+    parquet_values = [[master_id[val]] + [id[val]] + [dataset_name[val]] + [table_name[val]] + [column_name[val]] + list(data_values[val]) for val in range(len(parquet_df))]
 
     normalized_list = pseq(map(normalise_string_whitespace, parquet_values), processes=core_count, partition_size=size)
     features_dict = pseq(map(extract_features, normalized_list), processes=core_count, partition_size=size)

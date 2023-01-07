@@ -31,7 +31,7 @@ WORD_PATTERN = re.compile(r"[\w+]")
 #
 # SPECIAL_CHARACTERS_PATTERN = re.compile(SPECIAL_CHARACTERS_REGEX)
 
-SPECIAL_CHARACTERS_PATTERN = re.compile(r'[!@#$%^&*(),.?":{}|<>]')
+SPECIAL_CHARACTERS_PATTERN = re.compile(r'[!#&\'()*+\-/:;<=>?@[\\]^_`{|}~]')
 
 
 # Input: a single column in the form of a Python list
@@ -70,7 +70,10 @@ def extract_bag_of_words_features(col_values: list, col_values_wo_nan_uncased: l
         col_values, TEXT_PATTERN
     )
     
-    alphanum_cell_counts = [len(col_values[idx]) if (numeric_char_counts[idx]>0 and text_char_counts[idx]>0) else 0 for idx in range(len(col_values))]
+    # Average + std number of special characters in each cell
+    spec_char_counts = count_pattern_in_cells(col_values, SPECIAL_CHARACTERS_PATTERN)
+    
+    alphanum_cell_counts = [len(col_values[idx]) if (numeric_char_counts[idx]>0 and (spec_char_counts[idx]>0 or text_char_counts[idx]>0)) else 0 for idx in range(len(col_values))]
     alphanum_cell_nz_count, alphanum_char_counts = sum(1 for c in alphanum_cell_counts if c > 0), alphanum_cell_counts
 
     features["numeric_cell_nz_count"] = numeric_cell_nz_count
@@ -94,9 +97,6 @@ def extract_bag_of_words_features(col_values: list, col_values_wo_nan_uncased: l
     # Average + std number of alphanum tokens in cells
     features["avg_alphanum_cells"] = np.mean(alphanum_char_counts) if n_val > 0 else 0
     features["std_alphanum_cells"] = np.std(alphanum_char_counts) if n_val > 0 else 0
-
-    # Average + std number of special characters in each cell
-    spec_char_counts = count_pattern_in_cells(col_values, SPECIAL_CHARACTERS_PATTERN)
 
     features["avg_spec_cells"] = np.mean(spec_char_counts) if n_val > 0 else 0
     features["std_spec_cells"] = np.std(spec_char_counts) if n_val > 0 else 0
