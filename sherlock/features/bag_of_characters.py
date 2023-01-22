@@ -6,41 +6,42 @@ from sherlock.global_state import is_first
 from datetime import datetime
 
 character_mapping = {
- '!':"exclamation",
- '"':"double_quotes",
- '#':"hashtag",
- '$':"dollar",
- '%':"percentage",
- '&':"ampersand",
- "'":"single_quotes",
- '(':"open_round_bracket",
- ')':"close_round_bracket",
- '*':"asterisk",
- '+':"plus",
- ',':"comma",
- '-':"minus",
- '.':"full_stop",
- '/':"forward_slash",
- ':':"colon",
- ';':"semi_colon",
- '<':"less_than",
- '=':"equal_to",
- '>':"greater_than",
- '?':"question_mark",
- '@':"at_the_rate",
- '[':"open_square_bracket",
- ']':"close_square_bracket",
- '_':"underscore",
- '`':"escape_character",
- '{':"open_curly_bracket",
- '|':"vertical_bar",
- '}':"close_curly_bracket",
- '~':"tilde",
- ' ':"space",
- '\x0c':"form_feed",
- '\\':"backward_slash",
- '^':"xor_operator"
+    '!': "exclamation",
+    '"': "double_quotes",
+    '#': "hashtag",
+    '$': "dollar",
+    '%': "percentage",
+    '&': "ampersand",
+    "'": "single_quotes",
+    '(': "open_round_bracket",
+    ')': "close_round_bracket",
+    '*': "asterisk",
+    '+': "plus",
+    ',': "comma",
+    '-': "minus",
+    '.': "full_stop",
+    '/': "forward_slash",
+    ':': "colon",
+    ';': "semi_colon",
+    '<': "less_than",
+    '=': "equal_to",
+    '>': "greater_than",
+    '?': "question_mark",
+    '@': "at_the_rate",
+    '[': "open_square_bracket",
+    ']': "close_square_bracket",
+    '_': "underscore",
+    '`': "escape_character",
+    '{': "open_curly_bracket",
+    '|': "vertical_bar",
+    '}': "close_curly_bracket",
+    '~': "tilde",
+    ' ': "space",
+    '\x0c': "form_feed",
+    '\\': "backward_slash",
+    '^': "xor_operator"
 }
+
 
 # Input: a single column in the form of Python list
 # Output: ordered dictionary holding bag of character features
@@ -48,12 +49,12 @@ def extract_bag_of_characters_features(col_values: list, features: OrderedDict):
     # Create a set of unique chars from the string vectors to quickly test whether to perform expensive
     # processing for any given char
     char_set = set(''.join(col_values))
-    
+
     start_time = datetime.now()
-    print('Bag of characters started:',start_time)
+    print('Bag of characters started:', start_time)
 
     for c in CHARACTERS_TO_CHECK:
-        
+
         if c in character_mapping.keys():
             value_feature_name = f'n_[{character_mapping[c]}]'
         else:
@@ -108,4 +109,4 @@ def extract_bag_of_characters_features(col_values: list, features: OrderedDict):
 
     end_time = datetime.now()
     print('Bag of characters completed:', end_time)
-    print('Total time taken for bag of characters:',end_time-start_time)
+    print('Total time taken for bag of characters:', end_time - start_time)

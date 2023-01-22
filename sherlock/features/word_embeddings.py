@@ -52,7 +52,6 @@ def transpose(a):
 # Input: a single column in the form of a Python list
 # Output: ordered dictionary holding word embedding features
 def extract_word_embeddings_features(col_values: list, features: OrderedDict, prefix: str):
-
     start_time = datetime.now()
     print('word embeddings feature started:', start_time)
 
@@ -153,7 +152,7 @@ def extract_word_embeddings_features(col_values: list, features: OrderedDict, pr
         features[prefix + '_word_embedding_feature'] = 1
 
     print('word embeddings statistical aggregation completed:', datetime.now())
-	
+
     end_time = datetime.now()
     print('word embeddings feature completed:', end_time)
-    print('Total time taken for word embeddings features:',end_time-start_time)
+    print('Total time taken for word embeddings features:', end_time - start_time)

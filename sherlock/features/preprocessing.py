@@ -19,7 +19,9 @@ from sherlock.features.paragraph_vectors import infer_paragraph_embeddings_featu
 from sherlock.global_state import set_first, reset_first
 from sherlock.features.helpers import literal_eval_as_str, keys_to_csv
 from datetime import datetime
-ignoreList = ['#na','#n/a','na','n/a','none','nan','blank','blanks']
+
+ignoreList = ['#na', '#n/a', 'na', 'n/a', 'none', 'nan', 'blank', 'blanks']
+
 
 def prepare_feature_extraction():
     """Download embedding files from Google Drive if they do not exist yet."""
@@ -81,24 +83,27 @@ def prepare_feature_extraction():
 
     print("All files for extracting word and paragraph embeddings are present.")
 
+
 #### Remove ASCII Characters from the data
 def removeASCII(strs):
-    return ''.join([char for word in str(strs) for char in word if ord(char)<128])
+    return ''.join([char for word in str(strs) for char in word if ord(char) < 128])
+
 
 def additional_processing(col_values: list):
-    print('Custom Preprocessing started:',datetime.now())
+    print('Custom Preprocessing started:', datetime.now())
     value = ['' if val is None or pd.isnull(val) else val for val in col_values]
     value = ['' if str(val).lower() in ignoreList else val for val in value]
-    value = [str(val).replace('\xa0',' ').strip() for val in value]
-    value = [removeASCII(val) for val in value] ### Remove Ascii Characters
-    print('Custom preprocessing completed:',datetime.now())
+    value = [str(val).replace('\xa0', ' ').strip() for val in value]
+    value = [removeASCII(val) for val in value]  ### Remove Ascii Characters
+    print('Custom preprocessing completed:', datetime.now())
     return value
 
+
 def convert_string_lists_to_lists(
-    data: Union[pd.DataFrame, pd.Series],
-    labels: Union[pd.DataFrame, pd.Series],
-    data_column_name: str = None,
-    labels_column_name: str = None,
+        data: Union[pd.DataFrame, pd.Series],
+        labels: Union[pd.DataFrame, pd.Series],
+        data_column_name: str = None,
+        labels_column_name: str = None,
 ) -> Tuple[list, list]:
     """Convert strings of arrays with values to arrays of strings of values.
     Each row in de dataframe or series corresponds to a column, represented by a string of a list.
@@ -173,10 +178,10 @@ def extract_features(output_filename, data: Union[pd.DataFrame, pd.Series]):
     first_keys = None
 
     reset_first()
-    
+
     with open(output_filename, "w") as outfile:
-        for index,row in tqdm(data.iterrows(), desc="Extracting Features"):
-            
+        for index, row in tqdm(data.iterrows(), desc="Extracting Features"):
+
             raw_sample = row['values']
             table_name = row['table_name']
             column_name = row['column_name']
@@ -187,24 +192,24 @@ def extract_features(output_filename, data: Union[pd.DataFrame, pd.Series]):
                 random.seed(13)
                 raw_sample = random.sample(raw_sample, k=n_samples)
             else:
-                n_samples = n_values      
+                n_samples = n_values
 
             features = OrderedDict()
-	
+
             cleaned_sample_nan = additional_processing(raw_sample)
-            cleaned_sample_wo_nan = [val for val in cleaned_sample_nan if len(val)>0]
+            cleaned_sample_wo_nan = [val for val in cleaned_sample_nan if len(val) > 0]
             cleaned_sample_wo_nan_uncased = [val.lower() for val in cleaned_sample_wo_nan]
             uniq_cleaned_sample = list(set(cleaned_sample_wo_nan))
 
             extract_bag_of_characters_features(cleaned_sample_wo_nan, features)
-            extract_word_embeddings_features(cleaned_sample_wo_nan, features,prefix = 'values')
-            extract_word_embeddings_features([column_name], features ,prefix = 'columns')
-            extract_word_embeddings_features([table_name], features,prefix = 'tables')
-            extract_bag_of_words_features(cleaned_sample_nan,cleaned_sample_wo_nan_uncased, features, n_samples)
+            extract_word_embeddings_features(cleaned_sample_wo_nan, features, prefix='values')
+            extract_word_embeddings_features([column_name], features, prefix='columns')
+            extract_word_embeddings_features([table_name], features, prefix='tables')
+            extract_bag_of_words_features(cleaned_sample_nan, cleaned_sample_wo_nan_uncased, features, n_samples)
             extract_addl_feats(cleaned_sample_nan, features, n_samples)
             features['table_population'] = n_values
             features['table_sample'] = n_samples
-            
+
             # TODO use data_no_null version?
             infer_paragraph_embeddings_features(
                 uniq_cleaned_sample, features, vec_dim, reuse_model
@@ -218,7 +223,7 @@ def extract_features(output_filename, data: Union[pd.DataFrame, pd.Series]):
 
                 outfile.write(first_keys_str + "\n")
 
-                #set_first()
+                # set_first()
             elif verify_keys:
                 keys = ",".join(features.keys())
                 if first_keys_str != keys:

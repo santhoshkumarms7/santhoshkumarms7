@@ -12,6 +12,7 @@ from sherlock.global_state import is_first
 
 assert gensim.models.doc2vec.FAST_VERSION > -1, "This will be painfully slow otherwise"
 
+
 def tokenise(values):
     joined = " ".join(s for s in values if len(s) >= 2)
 
@@ -78,15 +79,15 @@ DIM = 400
 model: Doc2Vec
 
 
-def initialise_pretrained_model(path,dim):
+def initialise_pretrained_model(path, dim):
     start = datetime.now()
     global model
 
-    filename = f"{path}/par_vec_trained_model_{dim}.pkl"        
+    filename = f"{path}/par_vec_trained_model_{dim}.pkl"
     assert dim == DIM
 
     model = Doc2Vec.load(filename)
-    
+
     model.delete_temporary_training_data(keep_doctags_vectors=True, keep_inference=True)
     print(
         f"Initialise Doc2Vec Model, {dim} dim, process took {datetime.now() - start} seconds. (filename = {filename})"
@@ -112,7 +113,7 @@ def initialise_nltk():
 # Input: a single column in the form of a pandas Series.
 # Output: ordered dictionary holding paragraph vector features
 def infer_paragraph_embeddings_features(
-    col_values: list, features: OrderedDict, dim, reuse_model
+        col_values: list, features: OrderedDict, dim, reuse_model
 ):
     if not reuse_model or model is None:
         # Load pretrained paragraph vector model
@@ -131,7 +132,7 @@ def infer_paragraph_embeddings_features(
     model.random.seed(13)
 
     tokens = tokenise(col_values)
-    
+
     # Infer paragraph vector for data sample.
     inferred = model.infer_vector(tokens, steps=20, alpha=0.025)
 
@@ -146,4 +147,4 @@ def infer_paragraph_embeddings_features(
 
     end_time = datetime.now()
     print('paragraph embeddings feature completed:', end_time)
-    print('Total time taken for paragraph embeddings features:',end_time-start_time)
+    print('Total time taken for paragraph embeddings features:', end_time - start_time)
